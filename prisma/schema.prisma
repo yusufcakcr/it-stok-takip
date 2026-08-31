@@ -1,0 +1,135 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ItemCategory {
+  HARDWARE
+  LICENSE
+  CONSUMABLE
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  name          String?
+  password      String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  stockMovements StockMovement[]
+  activityLogs  ActivityLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model Hardware {
+  id                String   @id @default(cuid())
+  name              String
+  brand             String?
+  model             String?
+  serialNumber      String?
+  quantity          Int      @default(0)
+  location          String?
+  notes             String?
+  lowStockThreshold Int      @default(5)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model License {
+  id                String    @id @default(cuid())
+  softwareName      String
+  licenseKey        String?
+  quantity          Int       @default(0)
+  expiryDate        DateTime?
+  notes             String?
+  lowStockThreshold Int       @default(5)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Consumable {
+  id                String   @id @default(cuid())
+  name              String
+  brand             String?
+  quantity          Int      @default(0)
+  unit              String?  @default("Adet")
+  notes             String?
+  lowStockThreshold Int      @default(5)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model StockMovement {
+  id            String       @id @default(cuid())
+  itemCategory  ItemCategory
+  itemId        String
+  itemName      String
+  movementType  MovementType
+  quantity      Int
+  description   String?
+  userId        String
+  userName      String
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  userName  String
+  action    String
+  details   String?
+  category  String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

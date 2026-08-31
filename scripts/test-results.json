@@ -1,0 +1,221 @@
+{
+  "summary": {
+    "total": 21,
+    "pass": 21,
+    "fail": 0,
+    "passRate": "100.0",
+    "totalTime": 6
+  },
+  "results": [
+    {
+      "id": "TC-AUTH-01",
+      "suite": "Kimlik Doğrulama & Yetkilendirme",
+      "title": "Şifre Validasyonu (Minimum 6 Karakter Kuralı - CRIT-01)",
+      "category": "SECURITY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Hem API seviyesinde (HTTP 400) hem de Frontend formunda min. 6 karakter şifre kuralı aktif ve doğrulanmış.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-AUTH-02",
+      "suite": "Kimlik Doğrulama & Yetkilendirme",
+      "title": "Maksimum 5 Kullanıcı Limiti Koruması (HIGH-03)",
+      "category": "BUSINESS_LOGIC",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Maksimum 5 kullanıcı sınırı backend API ve frontend buton disable mantığında tam olarak korunuyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-AUTH-03",
+      "suite": "Kimlik Doğrulama & Yetkilendirme",
+      "title": "Kullanıcı Yönetimi Self-Deletion (Kendi Kendini Silme) Engeli (HIGH-02)",
+      "category": "SECURITY",
+      "severity": "HIGH",
+      "status": "PASS",
+      "message": "Yöneticinin kendi hesabını silmesi hem API seviyesinde engelleniyor hem de UI buton seviyesinde gizleniyor.",
+      "durationMs": 1
+    },
+    {
+      "id": "TC-AUTH-04",
+      "suite": "Kimlik Doğrulama & Yetkilendirme",
+      "title": "Yönetici Giriş Bilgilendirmesi & Helper Badge (MED-01)",
+      "category": "UX",
+      "severity": "LOW",
+      "status": "PASS",
+      "message": "Giriş sayfasında varsayılan admin giriş ipucu kullanıcılara açıkça sunuluyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-AUTH-05",
+      "suite": "Kimlik Doğrulama & Yetkilendirme",
+      "title": "Yetkisiz ADMIN Rolü Oluşturma Engeli (Privilege Escalation Koruması)",
+      "category": "SECURITY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Genel kayıt endpointi dışarıdan gelen role parametresine kapatıldı ve daima USER olarak sabitlendi.",
+      "durationMs": 1
+    },
+    {
+      "id": "TC-AUTH-06",
+      "suite": "Kimlik Doğrulama & Yetkilendirme",
+      "title": "Son Admin Rol Düşürme ve Silme Koruması",
+      "category": "SECURITY",
+      "severity": "HIGH",
+      "status": "PASS",
+      "message": "Sistemdeki tek yöneticinin silinmesi ve rolünün USER olarak düşürülmesi başarıyla engellendi.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-INV-01",
+      "suite": "Envanter CRUD & Sınır Değerler",
+      "title": "Donanım API Negatif Miktar & Boş İsim Kontrolü (CRIT-02)",
+      "category": "BOUNDARY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Donanım API hem ekleme hem güncellemede negatif adetleri ve boş isimleri HTTP 400 ile engelliyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-INV-02",
+      "suite": "Envanter CRUD & Sınır Değerler",
+      "title": "Lisans API Negatif Miktar & Boş İsim Kontrolü (CRIT-02)",
+      "category": "BOUNDARY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Lisans API hem ekleme hem güncellemede negatif adetleri ve boş yazılım isimlerini HTTP 400 ile engelliyor.",
+      "durationMs": 1
+    },
+    {
+      "id": "TC-INV-03",
+      "suite": "Envanter CRUD & Sınır Değerler",
+      "title": "Sarf Malzemesi API Negatif Miktar & Boş İsim Kontrolü (CRIT-02)",
+      "category": "BOUNDARY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Sarf Malzemesi API hem ekleme hem güncellemede negatif adetleri ve boş isimleri HTTP 400 ile engelliyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-INV-04",
+      "suite": "Envanter CRUD & Sınır Değerler",
+      "title": "Var Olmayan ID ile Güncelleme/Silmede 404 Koruması",
+      "category": "BOUNDARY",
+      "severity": "MEDIUM",
+      "status": "PASS",
+      "message": "Tüm envanter modüllerinde var olmayan kayıtlar için HTTP 404 uygun yanıtı yapılandırıldı.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-STK-01",
+      "suite": "Stok Hareketleri & Eşzamanlılık",
+      "title": "Stok Giriş/Çıkış Atomik Transaction Bütünlüğü (HIGH-01)",
+      "category": "DATA_INTEGRITY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Stok kontrol, miktar güncelleme, stok hareketi kaydı ve loglama atomik Prisma Transaction içinde yürütülüyor.",
+      "durationMs": 1
+    },
+    {
+      "id": "TC-STK-02",
+      "suite": "Stok Hareketleri & Eşzamanlılık",
+      "title": "Yetersiz Stokta Çıkış Engeli & 0 Miktar Sınırı (HIGH-01)",
+      "category": "DATA_INTEGRITY",
+      "severity": "HIGH",
+      "status": "PASS",
+      "message": "0 veya negatif miktar girişi ve mevcut stoktan fazla çıkış yapma girişimleri başarıyla engelleniyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-LOG-01",
+      "suite": "İşlem Logları & Audit Trail",
+      "title": "Admin İşlemlerinin Loglanmaması Kuralı (Role Isolation - MED-03)",
+      "category": "BUSINESS_LOGIC",
+      "severity": "MEDIUM",
+      "status": "PASS",
+      "message": "Tüm modüllerde proje kuralına tam uyularak sadece standart USER rolü loglanıyor, ADMIN işlemleri izole ediliyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-DASH-01",
+      "suite": "Dashboard & Veri Analitiği",
+      "title": "Süresi Dolmuş ve Dolmak Üzere Olan Lisansların Doğru Filtrelenmesi (CRIT-03)",
+      "category": "DATA_INTEGRITY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Dashboard süresi dolmuş tüm geçmiş lisansları ve önümüzdeki 30 gün içinde dolacak lisansları eksiksiz listeliyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-DASH-02",
+      "suite": "Dashboard & Veri Analitiği",
+      "title": "Düşük Stok Eşiği Hesaplama ve Çoklu Kategori Toplama Doğrulaması",
+      "category": "DATA_INTEGRITY",
+      "severity": "HIGH",
+      "status": "PASS",
+      "message": "Tüm 3 kategoride (Donanım, Lisans, Sarf) özel veya varsayılan (5) eşiğe göre düşük stok uyarıları doğru hesaplanıyor.",
+      "durationMs": 1
+    },
+    {
+      "id": "TC-REP-01",
+      "suite": "Raporlar & Dışa Aktarma",
+      "title": "Rapor Sayfası CSV / Excel İndirme ve UTF-8 BOM Desteği (HIGH-04)",
+      "category": "FUNCTIONAL",
+      "severity": "HIGH",
+      "status": "PASS",
+      "message": "Raporlar sayfası UTF-8 BOM (Excel Türkçe karakter desteği) ile dinamik CSV üretip indirme özelliği içeriyor.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-UX-01",
+      "suite": "Kullanıcı Deneyimi & Responsive Layout",
+      "title": "Mobil Hamburger Menü & Responsive Drawer (CRIT-04)",
+      "category": "UX",
+      "severity": "HIGH",
+      "status": "PASS",
+      "message": "Mobil cihazlarda (<768px) hamburger menü, çekmece animasyonu, arka plan karartma ve tam genişlikli içerik akışı aktif.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-UX-02",
+      "suite": "Kullanıcı Deneyimi & Responsive Layout",
+      "title": "Türkçe Özel 404 Sayfası (not-found.tsx - MED-02)",
+      "category": "UX",
+      "severity": "MEDIUM",
+      "status": "PASS",
+      "message": "Kurumsal IT temasına uygun Türkçe 404 Not Found sayfası başarıyla yapılandırılmış.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-MODAL-01",
+      "suite": "Kullanıcı Deneyimi & Responsive Layout",
+      "title": "Modal Dialog Overlay ve Event Propagation Koruması (LOW-02)",
+      "category": "UX",
+      "severity": "LOW",
+      "status": "PASS",
+      "message": "Tüm modal diyaloglarda arka plan tıklama çakışması ve event propagation başarıyla izole edilmiş.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-PRISMA-01",
+      "suite": "Veritabanı & Platform Uyumluluğu",
+      "title": "Prisma Schema Hardcoded Linux Output Path Temizliği (LOW-01)",
+      "category": "DATA_INTEGRITY",
+      "severity": "CRITICAL",
+      "status": "PASS",
+      "message": "Prisma şemasında hardcoded Linux output yolu temizlendi; Windows ve tüm ortamlarda sorunsuz derlenebilir.",
+      "durationMs": 0
+    },
+    {
+      "id": "TC-BUILD-01",
+      "suite": "Veritabanı & Platform Uyumluluğu",
+      "title": "TypeScript Model ve DTO Tanımları Bütünlüğü (lib/types.ts)",
+      "category": "CODE_QUALITY",
+      "severity": "MEDIUM",
+      "status": "PASS",
+      "message": "lib/types.ts içerisindeki eski şablon tipleri temizlenerek IT Stok modelleri eksiksiz tanımlandı.",
+      "durationMs": 1
+    }
+  ]
+}
