@@ -41,8 +41,9 @@ Bu sistem, şirket içi IT operasyonlarında karşılaşılan envanter karmaşas
 
 ### 5. 🛡️ Rol Bazlı Yetkilendirme ve Güvenlik (RBAC & Audit Trail)
 - **Yönetici (ADMIN)**: Tam envanter yönetimi, kullanıcı ekleme/silme, şifre sıfırlama (Şirket kuralı gereği Admin işlemleri loglanmaz).
-- **Kullanıcı (USER)**: Günlük operasyonel envanter ve stok işlemleri (Tüm hareketler `/logs` altında kaydedilir).
-- **Maksimum 5 Kullanıcı Koruması**: Güvenlik ve kaynak yönetimi için 5 kullanıcı sınırı.
+- **Kullanıcı (USER)**: Günlük operasyonel envanter ve stok işlemleri (Tüm hareketleri işlem günlüğüne yazılır; günlüğü yalnızca yönetici görüntüleyebilir).
+- **Kapalı Kayıt**: `/signup` yalnızca sistemde hiç kullanıcı yokken açıktır; ilk hesap ADMIN olur, sonrasında kullanıcıyı yalnızca yönetici ekler.
+- **Maksimum Kullanıcı Koruması**: Varsayılan 5 kullanıcı sınırı (`MAX_USERS` ile değiştirilebilir).
 - **Yönetici Kendi Hesabını ve Son Yöneticiyi Silme Koruması**.
 
 ### 6. 📊 Gösterge Paneli (Dashboard)
@@ -74,7 +75,7 @@ Bu sistem, şirket içi IT operasyonlarında karşılaşılan envanter karmaşas
 | **Veritabanı ORM** | Prisma ORM 6.7 |
 | **Veritabanı** | PostgreSQL (Neon Cloud / Yerel) |
 | **Kimlik Doğrulama** | Auth.js v5 (NextAuth.js Beta) + BcryptJS |
-| **Test & QC** | Kapsamlı Otomatik QA Test Suite (ESM) |
+| **Yetkilendirme** | Rota bazlı `proxy.ts` katmanı + rota içi `requireUser()` kontrolü |
 
 ---
 
@@ -82,7 +83,7 @@ Bu sistem, şirket içi IT operasyonlarında karşılaşılan envanter karmaşas
 
 ### 1. Depoyu Klonlayın
 ```bash
-git clone https://github.com/TheJosephWRLD/it-stok-takip.git
+git clone https://github.com/yusufcakcr/it-stok-takip.git
 cd it-stok-takip
 ```
 
@@ -92,18 +93,28 @@ npm install
 ```
 
 ### 3. Çevre Değişkenlerini (.env) Ayarlayın
-`.env.example` dosyasını referans alarak `.env` oluşturun:
-```ini
-DATABASE_URL="postgresql://kullanici:sifre@host:5432/veritabani?sslmode=require"
-NEXTAUTH_SECRET="guclu_ve_gizli_anahtar_32_karakter"
-AUTH_SECRET="guclu_ve_gizli_anahtar_32_karakter"
+```bash
+cp .env.example .env
 ```
 
-### 4. Veritabanını Senkronize Edin ve Başlangıç Verilerini Yükleyin
+Zorunlu alanlar:
+
+| Değişken | Açıklama |
+|---|---|
+| `DATABASE_URL` | PostgreSQL bağlantı adresi |
+| `AUTH_SECRET` | Oturum imzalama anahtarı — `openssl rand -base64 32` ile üretin |
+
+> `.env` dosyası `.gitignore` kapsamındadır ve asla commit edilmemelidir.
+
+### 4. Veritabanını Senkronize Edin ve Örnek Verileri Yükleyin
 ```bash
 npx prisma db push
-npx tsx scripts/seed.ts
+npm run seed
 ```
+
+Seed betiği kaynak kodda şifre taşımaz. İlk yöneticiyi seed ile oluşturmak isterseniz `.env`
+içine `SEED_ADMIN_EMAIL` ve `SEED_ADMIN_PASSWORD` (en az 8 karakter) ekleyin; eklemezseniz
+yönetici oluşturulmaz.
 
 ### 5. Uygulamayı Başlatın
 ```bash
@@ -118,29 +129,30 @@ Tarayıcınızda `http://localhost:3000` adresine gidin.
 
 ---
 
-## 🔐 Varsayılan Giriş Bilgileri
+## 🔐 İlk Yönetici Hesabı
 
-Sistem kurulumdan sonra otomatik olarak hazır bir yönetici hesabıyla başlar:
+Sistemde **varsayılan şifre yoktur.** Veritabanında hiç kullanıcı yokken `/signup` ekranı açıktır ve
+orada oluşturulan **ilk hesap otomatik olarak ADMIN** olur. İlk kullanıcı oluştuktan sonra kayıt
+ekranı kapanır; yeni kullanıcıları yalnızca bir yönetici **Kullanıcı Yönetimi** sayfasından ekleyebilir.
 
-- **E-posta**: `admin@itstok.com`
-- **Kullanıcı Adı**: `admin`
-- **Şifre**: `admin123`
+Alternatif olarak `.env` içindeki `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` değişkenleriyle
+`npm run seed` çalıştırarak yönetici oluşturabilirsiniz.
+
+### Güvenlik notları
+- Parolalar bcrypt (cost 12) ile saklanır, asgari uzunluk 8 karakterdir.
+- `/admin/*`, `/logs` ve `/api/users`, `/api/logs` uçları yalnızca ADMIN rolüne açıktır; kontrol hem
+  `proxy.ts` katmanında hem de rotanın kendi içinde (`requireUser`) yapılır.
+- Stok giriş/çıkışı atomik `increment` / koşullu `decrement` ile yazılır; eşzamanlı işlemlerde
+  kayıp güncelleme (lost update) ve eksi stok oluşmaz.
 
 ---
 
-## 🧪 Testleri Çalıştırma
-
-Uygulamanın tüm güvenlik, CRUD, veri bütünlüğü ve responsive kontrollerini test etmek için:
+## 🧪 Doğrulama
 
 ```bash
-# Kod Kalitesi
-npm run lint
-
-# Otomatik QA Test Paketi
-node scripts/qa-test-suite.mjs
-
-# Production Build
-npm run build
+npm run lint       # kod kalitesi
+npm run typecheck  # TypeScript tip denetimi
+npm run build      # production build
 ```
 
 ---

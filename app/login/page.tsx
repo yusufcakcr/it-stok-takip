@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Monitor, Lock, User, AlertCircle } from 'lucide-react'
@@ -13,7 +13,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Sistemde hiç kullanıcı yoksa ilk yöneticiyi oluşturma bağlantısı gösterilir
+  const [setupRequired, setSetupRequired] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    fetch('/api/signup')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setSetupRequired(Boolean(d?.setupRequired)))
+      .catch(() => setSetupRequired(false))
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,15 +99,16 @@ export default function LoginPage() {
             Giriş Yap
           </Button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            Hesabınız yok mu?{' '}
-            <Link href="/signup" className="text-primary hover:underline">Kayıt Ol</Link>
-          </p>
-
-          <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground/80">Varsayılan Yönetici Bilgileri:</p>
-            <p>Kullanıcı: <code className="text-primary font-mono">admin</code> | Şifre: <code className="text-primary font-mono">admin123</code></p>
-          </div>
+          {setupRequired ? (
+            <p className="text-center text-sm text-muted-foreground">
+              Sistemde henüz kullanıcı yok.{' '}
+              <Link href="/signup" className="text-primary hover:underline">İlk yöneticiyi oluştur</Link>
+            </p>
+          ) : (
+            <p className="text-center text-xs text-muted-foreground">
+              Hesabınız yoksa sistem yöneticinizden talep edin.
+            </p>
+          )}
         </form>
       </div>
     </div>
