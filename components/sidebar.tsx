@@ -28,12 +28,13 @@ const navItems = [
   { href: '/hardware', label: 'Donanım', icon: Monitor },
   { href: '/licenses', label: 'Lisanslar', icon: Key },
   { href: '/consumables', label: 'Sarf Malzemesi', icon: Package },
-  { href: '/logs', label: 'İşlem Logları', icon: ClipboardList },
   { href: '/reports', label: 'Raporlar', icon: BarChart3 },
 ]
 
+// İşlem günlüğü tüm kullanıcıların hareketini gösterdiği için yönetim bölümünde
 const adminItems = [
   { href: '/admin/users', label: 'Kullanıcı Yönetimi', icon: Users },
+  { href: '/logs', label: 'İşlem Logları', icon: ClipboardList },
 ]
 
 export function Sidebar({ user }: SidebarProps) {

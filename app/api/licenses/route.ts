@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { auth } from '@/auth'
+import { requireUser, serverError } from '@/lib/api-auth'
 
 async function logActivity(session: any, action: string, details: string) {
   if (session?.user && (session.user as any)?.role !== 'ADMIN') {
@@ -19,8 +19,8 @@ async function logActivity(session: any, action: string, details: string) {
 
 export async function GET() {
   try {
-    const session = await auth()
-    if (!session?.user) return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    const guard = await requireUser()
+    if (guard.error) return guard.error
     const items = await prisma.license.findMany({ orderBy: { createdAt: 'desc' } })
     return NextResponse.json(items?.map((i: any) => ({ ...i, createdAt: i?.createdAt?.toISOString?.() ?? '', updatedAt: i?.updatedAt?.toISOString?.() ?? '', expiryDate: i?.expiryDate?.toISOString?.() ?? null })) ?? [])
   } catch (error: any) {
@@ -31,8 +31,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user) return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    const guard = await requireUser()
+    if (guard.error) return guard.error
+    const session = { user: guard.user }
     const body = await request.json()
 
     const softwareName = body.softwareName ? String(body.softwareName).trim() : ''
@@ -70,8 +71,9 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user) return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    const guard = await requireUser()
+    if (guard.error) return guard.error
+    const session = { user: guard.user }
     const body = await request.json()
 
     if (!body.id) {
@@ -119,8 +121,9 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user) return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    const guard = await requireUser()
+    if (guard.error) return guard.error
+    const session = { user: guard.user }
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'Lisans ID gerekli' }, { status: 400 })
