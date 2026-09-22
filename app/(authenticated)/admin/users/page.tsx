@@ -6,6 +6,7 @@ import { Users, Plus, Trash2, KeyRound, ShieldCheck, ShieldAlert } from 'lucide-
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { MAX_USERS, MIN_PASSWORD_LENGTH } from '@/lib/constants'
 
 export default function UsersAdminPage() {
   const { data: session, status } = useSession()
@@ -39,8 +40,8 @@ export default function UsersAdminPage() {
       toast.error('Zorunlu alanları doldurunuz')
       return
     }
-    if (newUser.password.length < 6) {
-      toast.error('Şifre en az 6 karakter olmalıdır')
+    if (newUser.password.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalıdır`)
       return
     }
 
@@ -55,14 +56,7 @@ export default function UsersAdminPage() {
       if (!res.ok) {
         toast.error(data?.error ?? 'Kullanıcı oluşturulamadı')
       } else {
-        // If role was selected as ADMIN, update it via /api/users
-        if (newUser.role === 'ADMIN' && data?.id) {
-          await fetch('/api/users', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: data.id, role: 'ADMIN' }),
-          })
-        }
+        // Rol tek istekte /api/signup içinde atanır; ikinci bir PUT'a gerek yok
         toast.success('Kullanıcı başarıyla oluşturuldu')
         setShowAdd(false)
         setNewUser({ username: '', email: '', name: '', password: '', role: 'USER' })
@@ -93,8 +87,8 @@ export default function UsersAdminPage() {
 
   const handleResetPassword = async () => {
     if (!resetPwId || !newPassword) return
-    if (newPassword.length < 6) {
-      toast.error('Yeni şifre en az 6 karakter olmalıdır')
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`Yeni şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalıdır`)
       return
     }
     const res = await fetch('/api/users', {
@@ -136,17 +130,17 @@ export default function UsersAdminPage() {
           <h1 className="text-2xl font-display font-bold tracking-tight flex items-center gap-2">
             <Users className="w-6 h-6 text-indigo-400" /> Kullanıcı Yönetimi
           </h1>
-          <p className="text-muted-foreground mt-1">Sistem kullanıcılarını ve rollerini yönetin (Maksimum 5 kullanıcı)</p>
+          <p className="text-muted-foreground mt-1">Sistem kullanıcılarını ve rollerini yönetin (Maksimum {MAX_USERS} kullanıcı)</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} disabled={(users?.length ?? 0) >= 5}>
+        <Button onClick={() => setShowAdd(true)} disabled={(users?.length ?? 0) >= MAX_USERS}>
           <Plus className="w-4 h-4" /> Kullanıcı Ekle
         </Button>
       </div>
 
-      {(users?.length ?? 0) >= 5 && (
+      {(users?.length ?? 0) >= MAX_USERS && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3.5 text-sm text-amber-400 flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 shrink-0" />
-          <span>Maksimum kullanıcı sayısına (5/5) ulaşıldı. Yeni kullanıcı eklemek için mevcut bir kullanıcıyı silmelisiniz.</span>
+          <span>Maksimum kullanıcı sayısına ({MAX_USERS}/{MAX_USERS}) ulaşıldı. Yeni kullanıcı eklemek için mevcut bir kullanıcıyı silmelisiniz.</span>
         </div>
       )}
 
@@ -235,7 +229,7 @@ export default function UsersAdminPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Şifre (Min. 6 Karakter) <span className="text-destructive">*</span></label>
-                <Input type="password" minLength={6} value={newUser.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder="••••••••" required />
+                <Input type="password" minLength={MIN_PASSWORD_LENGTH} value={newUser.password} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder="••••••••" required />
               </div>
               <div>
                 <label className="text-sm font-medium">Rol</label>
@@ -265,11 +259,11 @@ export default function UsersAdminPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium">Yeni Şifre (Min. 6 Karakter)</label>
-                <Input type="password" minLength={6} value={newPassword} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)} placeholder="Yeni şifre..." />
+                <Input type="password" minLength={MIN_PASSWORD_LENGTH} value={newPassword} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)} placeholder="Yeni şifre..." />
               </div>
               <div className="flex gap-2 pt-2">
                 <Button variant="secondary" onClick={() => setResetPwId(null)} className="flex-1">İptal</Button>
-                <Button onClick={handleResetPassword} className="flex-1" disabled={!newPassword || newPassword.length < 6}>Şifreyi Güncelle</Button>
+                <Button onClick={handleResetPassword} className="flex-1" disabled={!newPassword || newPassword.length < MIN_PASSWORD_LENGTH}>Şifreyi Güncelle</Button>
               </div>
             </div>
           </div>

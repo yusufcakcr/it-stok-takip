@@ -22,21 +22,23 @@ npm install
 ### Adım 2: Çevre Değişkenlerini (.env) Yapılandırın
 `.env.example` dosyasını `.env` olarak kopyalayın ve veritabanı bağlantı adresinizi güncelleyin:
 
-```ini
-DATABASE_URL="postgresql://kullanici:sifre@localhost:5432/it_stok_takip?schema=public"
-NEXTAUTH_SECRET="guclu_ve_gizli_anahtar_32_karakter"
-AUTH_SECRET="guclu_ve_gizli_anahtar_32_karakter"
+```bash
+cp .env.example .env
 ```
 
-### Adım 3: Veritabanı Tablolarını Oluşturun ve Başlangıç Verilerini Yükleyin (Seed)
+Doldurulması zorunlu alanlar: `DATABASE_URL` ve `AUTH_SECRET`
+(`openssl rand -base64 32` ile üretin). `.env` dosyası `.gitignore` kapsamındadır, commit edilmez.
+
+### Adım 3: Veritabanı Tablolarını Oluşturun ve Örnek Verileri Yükleyin (Seed)
 ```bash
 npx prisma db push
-npm run prisma:seed # veya: npx tsx scripts/safe-seed.ts
+npm run seed
 ```
 
-> **Varsayılan Yönetici Girişi:**
-> - **Kullanıcı Adı**: `admin` veya `admin@itstok.com`
-> - **Şifre**: `admin123`
+> **İlk yönetici:** Sistemde varsayılan şifre yoktur. Veritabanı boşken `/signup` ekranında
+> oluşturulan ilk hesap ADMIN olur ve ardından kayıt ekranı kapanır. Alternatif olarak `.env`
+> içine `SEED_ADMIN_EMAIL` ve `SEED_ADMIN_PASSWORD` (en az 8 karakter) yazıp `npm run seed`
+> çalıştırabilirsiniz.
 
 ### Adım 4: Geliştirme Sunucusunu Başlatın
 ```bash
@@ -117,8 +119,8 @@ Tüm güvenlik, veri bütünlüğü, CRUD ve UI kontrollerini otomatik test etme
 # Kod Kalitesi ve Lint Kontrolü
 npm run lint
 
-# Kapsamlı QC Test Paketi
-node scripts/qa-test-suite.mjs
+# TypeScript Tip Denetimi
+npm run typecheck
 
 # Production Build Testi
 npm run build
@@ -128,8 +130,12 @@ npm run build
 
 ## 🔐 4. Güvenlik & İş Kuralları Özeti
 
-1. **Max 5 Kullanıcı Limiti**: Sistem maksimum 5 aktif kullanıcı destekler.
-2. **Rol Ayrımı (RBAC)**:
-   - `ADMIN`: Kullanıcı yönetimi, şifre sıfırlama, tam envanter yönetimi (Admin işlemleri loglanmaz).
-   - `USER`: Standart envanter ve stok işlemleri (Tüm hareketler `/logs` altında kaydedilir).
-3. **Stok Güvenliği**: Stoktan çıkış işlemleri atomik transaction altında yürütülür; yetersiz stok durumunda işlem engellenir ve eksi stok oluşamaz.
+1. **Max Kullanıcı Limiti**: Varsayılan 5; `MAX_USERS` ortam değişkeniyle değiştirilebilir.
+2. **Kapalı Kayıt**: `/signup` yalnızca sistemde hiç kullanıcı yokken herkese açıktır (ilk hesap ADMIN olur). Sonrasında kullanıcı ekleme yalnızca ADMIN yetkisiyle yapılır.
+3. **Rol Ayrımı (RBAC)**:
+   - `ADMIN`: Kullanıcı yönetimi, şifre sıfırlama, işlem günlüğü, tam envanter yönetimi (Admin işlemleri loglanmaz).
+   - `USER`: Standart envanter ve stok işlemleri (Tüm hareketler işlem günlüğüne kaydedilir; günlüğü yalnızca ADMIN görür).
+4. **Rota Koruması**: `proxy.ts` oturumsuz istekleri keser, yönetim rotalarını role göre filtreler; her API rotası ayrıca kendi içinde `requireUser()` ile doğrular.
+5. **Stok Güvenliği**: Girişler atomik `increment`, çıkışlar `quantity >= miktar` koşullu `decrement` ile yazılır; eşzamanlı işlemlerde kayıp güncelleme ve eksi stok oluşmaz.
+6. **Parola Politikası**: bcrypt cost 12, asgari 8 karakter. Kaynak kodda ve dokümanlarda varsayılan şifre bulunmaz.
+7. **Güvenlik Başlıkları**: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `HSTS` (`next.config.js`).

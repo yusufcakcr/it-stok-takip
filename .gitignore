@@ -1,0 +1,41 @@
+# bağımlılıklar
+node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/install-state.gz
+
+# derleme çıktıları
+.next/
+out/
+build/
+dist/
+next-env.d.ts
+
+# çevre değişkenleri — ASLA commit edilmez
+.env
+.env.*
+!.env.example
+
+# prisma
+prisma/*.db
+prisma/*.db-journal
+prisma/migrations/dev.db*
+
+# test / rapor çıktıları
+coverage/
+scripts/test-results.json
+
+# editör ve işletim sistemi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# dağıtım
+.vercel
+*.tsbuildinfo

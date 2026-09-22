@@ -4,36 +4,34 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  // Hidden test account (required by platform)
-  const testPassword = await bcrypt.hash('g#Tsoz4J2a', 12)
-  await prisma.user.upsert({
-    where: { email: 'abacus-f92d92f8@example.com' },
-    update: {},
-    create: {
-      email: 'abacus-f92d92f8@example.com',
-      username: 'abacus-test',
-      name: 'Test Admin',
-      password: testPassword,
-      role: 'ADMIN',
-    },
-  })
+  // Yönetici hesabı yalnızca ortam değişkenlerinden oluşturulur; kaynak koda şifre yazılmaz.
+  // Kullanım:  SEED_ADMIN_EMAIL=... SEED_ADMIN_PASSWORD=... yarn prisma db seed
+  const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase()
+  const adminPasswordPlain = process.env.SEED_ADMIN_PASSWORD
 
-  // Default Admin user requested by user/specification
-  const adminPassword = await bcrypt.hash('admin123', 12)
-  await prisma.user.upsert({
-    where: { email: 'admin@itstok.com' },
-    update: {
-      password: adminPassword,
-      role: 'ADMIN',
-    },
-    create: {
-      email: 'admin@itstok.com',
-      username: 'admin',
-      name: 'Admin',
-      password: adminPassword,
-      role: 'ADMIN',
-    },
-  })
+  if (adminEmail && adminPasswordPlain) {
+    if (adminPasswordPlain.length < 8) {
+      throw new Error('SEED_ADMIN_PASSWORD en az 8 karakter olmalıdır')
+    }
+    const adminUsername = process.env.SEED_ADMIN_USERNAME?.trim() || adminEmail.split('@')[0]
+    const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      // Mevcut hesabın şifresi sessizce sıfırlanmasın diye update boş bırakılır
+      update: {},
+      create: {
+        email: adminEmail,
+        username: adminUsername,
+        name: process.env.SEED_ADMIN_NAME?.trim() || 'Sistem Yöneticisi',
+        password: adminPassword,
+        role: 'ADMIN',
+      },
+    })
+    console.log(`Yönetici hazır: ${adminEmail}`)
+  } else {
+    console.log('SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD tanımlı değil — yönetici oluşturulmadı.')
+    console.log('İlk yöneticiyi uygulamadaki /signup ekranından da oluşturabilirsiniz.')
+  }
 
   // Sample hardware
   const hardwareData = [

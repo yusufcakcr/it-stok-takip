@@ -117,7 +117,7 @@ export default function HardwarePage() {
                   >
                     <td className="py-3 px-4 font-medium">
                       <div className="flex items-center gap-2">
-                        {isLow && <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" title="Düşük Stok" />}
+                        {isLow && <span title="Düşük Stok" className="inline-flex"><AlertTriangle className="w-4 h-4 text-red-400 shrink-0" aria-label="Düşük Stok" /></span>}
                         <span>{item?.name ?? '-'}</span>
                       </div>
                     </td>

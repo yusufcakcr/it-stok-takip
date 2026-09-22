@@ -1,12 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { auth } from '@/auth'
+import { requireUser, serverError } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
   try {
-    const session = await auth()
-    if (!session?.user) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
+    const guard = await requireUser()
+    if (guard.error) return guard.error
     
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') ?? 'stock'

@@ -7,6 +7,7 @@ import { Monitor, Lock, User, Mail, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
 
 export default function SignupPage() {
   const [username, setUsername] = useState('')
@@ -111,8 +112,8 @@ export default function SignupPage() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 className="pl-10"
                 required
-                minLength={6}
-                placeholder="En az 6 karakter"
+                minLength={MIN_PASSWORD_LENGTH}
+                placeholder={`En az ${MIN_PASSWORD_LENGTH} karakter`}
               />
             </div>
           </div>
