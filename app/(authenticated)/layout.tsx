@@ -18,8 +18,8 @@ export default async function AuthenticatedLayout({
       <div className="flex min-h-screen">
         <Sidebar user={{
           name: session.user.name ?? 'Kullanıcı',
-          role: (session.user as any)?.role ?? 'USER',
-          username: (session.user as any)?.username ?? '',
+          role: session.user.role ?? 'USER',
+          username: session.user.username ?? '',
         }} />
         <main className="flex-1 min-w-0 md:ml-64 p-4 md:p-6 pt-16 md:pt-6 overflow-auto">
           {children}

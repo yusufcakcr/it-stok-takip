@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Package, Plus, Pencil, Trash2, ArrowLeftRight, AlertTriangle, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ItemFormDialog } from '@/components/item-form-dialog'
 import { StockMovementDialog } from '@/components/stock-movement-dialog'
-import { toast } from 'sonner'
+import { TablePagination } from '@/components/table-pagination'
+import { useItemCrud } from '@/hooks/use-item-crud'
+import { usePagination } from '@/hooks/use-pagination'
+import { isLowStock } from '@/lib/stock'
+import type { ConsumableItem } from '@/lib/types'
 
 const fields = [
   { name: 'name', label: 'Ürün Adı', required: true, placeholder: 'Örn: CAT6 Kablo, Termal Macun' },
@@ -18,54 +22,22 @@ const fields = [
 ]
 
 export default function ConsumablesPage() {
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { items, loading, refresh, save, remove } = useItemCrud<ConsumableItem>('/api/consumables', {
+    created: 'Yeni sarf malzemesi eklendi',
+    updated: 'Sarf malzemesi güncellendi',
+    deleted: 'Sarf malzemesi silindi',
+    confirmDelete: 'Bu sarf malzemesini silmek istediğinize emin misiniz?',
+  })
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [editItem, setEditItem] = useState<any>(null)
-  const [movementItem, setMovementItem] = useState<any>(null)
+  const [editItem, setEditItem] = useState<ConsumableItem | null>(null)
+  const [movementItem, setMovementItem] = useState<ConsumableItem | null>(null)
 
-  const fetchItems = useCallback(async () => {
-    try {
-      const res = await fetch('/api/consumables')
-      if (res.ok) setItems(await res.json())
-    } catch (e: any) { console.error(e) }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { fetchItems() }, [fetchItems])
-
-  const handleSubmit = async (data: any) => {
-    const method = data?.id ? 'PUT' : 'POST'
-    const res = await fetch('/api/consumables', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const resData = await res.json()
-    if (!res.ok) {
-      throw new Error(resData?.error ?? 'Hata oluştu')
-    }
-    toast.success(data?.id ? 'Sarf malzemesi güncellendi' : 'Yeni sarf malzemesi eklendi')
-    fetchItems()
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bu sarf malzemesini silmek istediğinize emin misiniz?')) return
-    const res = await fetch(`/api/consumables?id=${id}`, { method: 'DELETE' })
-    const resData = await res.json()
-    if (res.ok) {
-      toast.success('Sarf malzemesi silindi')
-      fetchItems()
-    } else {
-      toast.error(resData?.error ?? 'Silme işlemi başarısız')
-    }
-  }
-
-  const filtered = items?.filter((i: any) =>
-    (i?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (i?.brand ?? '').toLowerCase().includes(search.toLowerCase())
-  ) ?? []
+  const q = search.toLowerCase()
+  const filtered = items.filter((i) =>
+    [i.name, i.brand].some((v) => (v ?? '').toLowerCase().includes(q))
+  )
+  const pager = usePagination(filtered)
 
   return (
     <div className="space-y-6">
@@ -83,7 +55,7 @@ export default function ConsumablesPage() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} placeholder="Sarf malzemesi ara..." className="pl-10" />
+        <Input value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); pager.setPage(1) }} placeholder="Sarf malzemesi ara..." className="pl-10" />
       </div>
 
       {loading ? (
@@ -103,8 +75,8 @@ export default function ConsumablesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item: any) => {
-                const isLow = (item?.quantity ?? 0) <= (item?.lowStockThreshold ?? 5)
+              {pager.pageItems.map((item) => {
+                const isLow = isLowStock(item)
                 return (
                   <tr
                     key={item?.id}
@@ -129,7 +101,7 @@ export default function ConsumablesPage() {
                         <Button variant="ghost" size="icon-sm" onClick={() => { setEditItem(item); setFormOpen(true) }} title="Düzenle">
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(item?.id)} title="Sil">
+                        <Button variant="ghost" size="icon-sm" onClick={() => remove(item.id)} title="Sil">
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
@@ -139,6 +111,7 @@ export default function ConsumablesPage() {
               })}
             </tbody>
           </table>
+          <TablePagination {...pager} onPageChange={pager.setPage} />
         </div>
       )}
 
@@ -148,18 +121,18 @@ export default function ConsumablesPage() {
         title={editItem ? 'Sarf Malzemesi Düzenle' : 'Yeni Sarf Malzemesi Ekle'}
         fields={fields}
         initialData={editItem}
-        onSubmit={handleSubmit}
+        onSubmit={save}
       />
 
       {movementItem && (
         <StockMovementDialog
           open={!!movementItem}
           onClose={() => setMovementItem(null)}
-          itemId={movementItem?.id}
-          itemName={movementItem?.name ?? ''}
+          itemId={movementItem.id}
+          itemName={movementItem.name}
           itemCategory="CONSUMABLE"
-          currentQuantity={movementItem?.quantity ?? 0}
-          onSuccess={fetchItems}
+          currentQuantity={movementItem.quantity}
+          onSuccess={refresh}
         />
       )}
     </div>

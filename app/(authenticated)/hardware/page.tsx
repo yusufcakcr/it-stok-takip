@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Monitor, Plus, Pencil, Trash2, ArrowLeftRight, AlertTriangle, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ItemFormDialog } from '@/components/item-form-dialog'
 import { StockMovementDialog } from '@/components/stock-movement-dialog'
-import { toast } from 'sonner'
+import { TablePagination } from '@/components/table-pagination'
+import { useItemCrud } from '@/hooks/use-item-crud'
+import { usePagination } from '@/hooks/use-pagination'
+import { isLowStock } from '@/lib/stock'
+import type { HardwareItem } from '@/lib/types'
 
 const fields = [
   { name: 'name', label: 'Ürün Adı', required: true, placeholder: 'Örn: Dell Latitude 5540' },
@@ -20,56 +24,22 @@ const fields = [
 ]
 
 export default function HardwarePage() {
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { items, loading, refresh, save, remove } = useItemCrud<HardwareItem>('/api/hardware', {
+    created: 'Yeni donanım eklendi',
+    updated: 'Donanım güncellendi',
+    deleted: 'Donanım silindi',
+    confirmDelete: 'Bu donanımı silmek istediğinize emin misiniz?',
+  })
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [editItem, setEditItem] = useState<any>(null)
-  const [movementItem, setMovementItem] = useState<any>(null)
+  const [editItem, setEditItem] = useState<HardwareItem | null>(null)
+  const [movementItem, setMovementItem] = useState<HardwareItem | null>(null)
 
-  const fetchItems = useCallback(async () => {
-    try {
-      const res = await fetch('/api/hardware')
-      if (res.ok) setItems(await res.json())
-    } catch (e: any) { console.error(e) }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { fetchItems() }, [fetchItems])
-
-  const handleSubmit = async (data: any) => {
-    const method = data?.id ? 'PUT' : 'POST'
-    const res = await fetch('/api/hardware', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const resData = await res.json()
-    if (!res.ok) {
-      throw new Error(resData?.error ?? 'Hata oluştu')
-    }
-    toast.success(data?.id ? 'Donanım güncellendi' : 'Yeni donanım eklendi')
-    fetchItems()
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bu donanımı silmek istediğinize emin misiniz?')) return
-    const res = await fetch(`/api/hardware?id=${id}`, { method: 'DELETE' })
-    const resData = await res.json()
-    if (res.ok) {
-      toast.success('Donanım silindi')
-      fetchItems()
-    } else {
-      toast.error(resData?.error ?? 'Silme işlemi başarısız')
-    }
-  }
-
-  const filtered = items?.filter((i: any) =>
-    (i?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (i?.brand ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (i?.model ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (i?.serialNumber ?? '').toLowerCase().includes(search.toLowerCase())
-  ) ?? []
+  const q = search.toLowerCase()
+  const filtered = items.filter((i) =>
+    [i.name, i.brand, i.model, i.serialNumber].some((v) => (v ?? '').toLowerCase().includes(q))
+  )
+  const pager = usePagination(filtered)
 
   return (
     <div className="space-y-6">
@@ -87,7 +57,7 @@ export default function HardwarePage() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} placeholder="Donanım ara..." className="pl-10" />
+        <Input value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); pager.setPage(1) }} placeholder="Donanım ara..." className="pl-10" />
       </div>
 
       {loading ? (
@@ -108,8 +78,8 @@ export default function HardwarePage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item: any) => {
-                const isLow = (item?.quantity ?? 0) <= (item?.lowStockThreshold ?? 5)
+              {pager.pageItems.map((item) => {
+                const isLow = isLowStock(item)
                 return (
                   <tr
                     key={item?.id}
@@ -135,7 +105,7 @@ export default function HardwarePage() {
                         <Button variant="ghost" size="icon-sm" onClick={() => { setEditItem(item); setFormOpen(true) }} title="Düzenle">
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(item?.id)} title="Sil">
+                        <Button variant="ghost" size="icon-sm" onClick={() => remove(item.id)} title="Sil">
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
@@ -145,6 +115,7 @@ export default function HardwarePage() {
               })}
             </tbody>
           </table>
+          <TablePagination {...pager} onPageChange={pager.setPage} />
         </div>
       )}
 
@@ -154,18 +125,18 @@ export default function HardwarePage() {
         title={editItem ? 'Donanım Düzenle' : 'Yeni Donanım Ekle'}
         fields={fields}
         initialData={editItem}
-        onSubmit={handleSubmit}
+        onSubmit={save}
       />
 
       {movementItem && (
         <StockMovementDialog
           open={!!movementItem}
           onClose={() => setMovementItem(null)}
-          itemId={movementItem?.id}
-          itemName={movementItem?.name ?? ''}
+          itemId={movementItem.id}
+          itemName={movementItem.name}
           itemCategory="HARDWARE"
-          currentQuantity={movementItem?.quantity ?? 0}
-          onSuccess={fetchItems}
+          currentQuantity={movementItem.quantity}
+          onSuccess={refresh}
         />
       )}
     </div>

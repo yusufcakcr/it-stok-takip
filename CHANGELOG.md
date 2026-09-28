@@ -2,6 +2,33 @@
 
 En yeni sürüm en üstte.
 
+## [1.2.0] — 2026-09-28 — Kod kalitesi ve test altyapısı
+
+### Değişti
+- **Tekrarlanan API kodu tek yerde.** Donanım, lisans ve sarf malzemesi rotaları %80 aynı koddu;
+  artık ortak `createItemRoutes` fabrikasını (`lib/item-routes.ts`) kullanıyorlar. Her rota ~145
+  satırdan ~30 satıra indi. Sayfalardaki liste/kaydet/sil akışı da `useItemCrud` hook'unda toplandı.
+- **İstek doğrulaması zod ile.** Tüm yazma uçlarının gövdesi `lib/validation.ts` şemalarıyla
+  doğrulanıyor; hata mesajları Türkçe ve öncekilerle aynı.
+- **`any` kaldırıldı.** Uygulama kodunda tip güvenliği sağlandı; oturum tipine `role` ve `username`
+  eklendi.
+- Düşük stok ve lisans bitiş hesapları tek yerde (`lib/stock.ts`); panel, raporlar ve sayfalar aynı
+  kuralı kullanıyor.
+
+### Eklendi
+- Donanım, lisans, sarf malzemesi ve işlem günlüğü tablolarında **sayfalama** (25 kayıt).
+- **Birim testleri** (Vitest, 27 test) ve **GitHub Actions CI** (tip denetimi, lint, test).
+
+### Düzeltildi
+- Geçersiz tarih veya sayı gönderildiğinde veritabanı hatası (500) yerine anlaşılır 400 hatası dönüyor
+  (ör. lisans bitiş tarihi, adet alanına metin, bozuk JSON).
+- **CSV dışa aktarma:** tırnak içeren değerler dosyayı bozuyordu; `=`, `+`, `-`, `@` ile başlayan
+  değerler Excel'de formül olarak çalışabiliyordu (CSV injection). İkisi de engellendi.
+- Rapor ve günlük uçlarında beklenmeyen hatalar ayrıntı sızdırmadan sabit mesajla dönüyor.
+
+> Veritabanı şeması değişmedi; mevcut veriler etkilenmez. Üç ürün tablosunu tek `Item` tablosunda
+> birleştirmek bilinçli olarak ertelendi (canlı veride göç gerektirir).
+
 ## [1.1.0] — 2026-09-22 — Güvenlik ve veri bütünlüğü revizyonu
 
 ### 🔴 Güvenlik (kritik)

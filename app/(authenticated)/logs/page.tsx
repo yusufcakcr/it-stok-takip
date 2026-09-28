@@ -4,9 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { ClipboardList, Search, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TablePagination } from '@/components/table-pagination'
+import { usePagination } from '@/hooks/use-pagination'
+import type { ActivityLog } from '@/lib/types'
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<any[]>([])
+  const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -22,18 +25,19 @@ export default function LogsPage() {
       if (category) params.set('category', category)
       const res = await fetch(`/api/logs?${params.toString()}`)
       if (res.ok) setLogs(await res.json())
-    } catch (e: any) { console.error(e) }
+    } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [startDate, endDate, category])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
-  const filtered = logs?.filter((l: any) =>
+  const filtered = logs.filter((l) =>
     !searchText ||
     (l?.userName ?? '').toLowerCase().includes(searchText.toLowerCase()) ||
     (l?.action ?? '').toLowerCase().includes(searchText.toLowerCase()) ||
     (l?.details ?? '').toLowerCase().includes(searchText.toLowerCase())
-  ) ?? []
+  )
+  const pager = usePagination(filtered)
 
   const actionLabels: Record<string, string> = {
     'DONANIM_EKLE': 'Donanım Ekleme',
@@ -84,7 +88,7 @@ export default function LogsPage() {
           <label className="text-xs text-muted-foreground font-medium mb-1 block">Arama</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={searchText} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchText(e.target.value)} placeholder="Kullanıcı, işlem veya detay..." className="pl-10 w-full" />
+            <Input value={searchText} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearchText(e.target.value); pager.setPage(1) }} placeholder="Kullanıcı, işlem veya detay..." className="pl-10 w-full" />
           </div>
         </div>
         <Button variant="secondary" onClick={fetchLogs}><Filter className="w-4 h-4" /> Filtrele</Button>
@@ -107,7 +111,7 @@ export default function LogsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((log: any) => (
+              {pager.pageItems.map((log) => (
                 <tr
                   key={log?.id}
                   className="border-b border-border/50 hover:bg-muted/30 transition-colors"
@@ -118,7 +122,7 @@ export default function LogsPage() {
                   <td className="py-3 px-4 font-medium">{log?.userName ?? '-'}</td>
                   <td className="py-3 px-4">
                     <span className="bg-primary/10 text-primary font-medium text-xs px-2.5 py-1 rounded-full">
-                      {actionLabels?.[log?.action] ?? log?.action ?? '-'}
+                      {actionLabels[log.action] ?? log.action ?? '-'}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">{log?.details ?? '-'}</td>
@@ -129,6 +133,7 @@ export default function LogsPage() {
               ))}
             </tbody>
           </table>
+          <TablePagination {...pager} onPageChange={pager.setPage} />
         </div>
       )}
     </div>

@@ -1,17 +1,19 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { requireUser, serverError } from '@/lib/api-auth'
+import { serialize, serializeAll } from '@/lib/serialize'
+import { CATEGORY_LABELS, isLowStock } from '@/lib/stock'
+import { parseDateParam } from '@/lib/validation'
 
 export async function GET(request: Request) {
   try {
     const guard = await requireUser()
     if (guard.error) return guard.error
-    
+
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') ?? 'stock'
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
 
     if (type === 'stock') {
       const [hardware, licenses, consumables] = await Promise.all([
@@ -20,41 +22,35 @@ export async function GET(request: Request) {
         prisma.consumable.findMany({ orderBy: { name: 'asc' } }),
       ])
       return NextResponse.json({
-        hardware: hardware?.map((i: any) => ({ ...i, createdAt: i?.createdAt?.toISOString?.() ?? '', updatedAt: i?.updatedAt?.toISOString?.() ?? '' })) ?? [],
-        licenses: licenses?.map((i: any) => ({ ...i, createdAt: i?.createdAt?.toISOString?.() ?? '', updatedAt: i?.updatedAt?.toISOString?.() ?? '', expiryDate: i?.expiryDate?.toISOString?.() ?? null })) ?? [],
-        consumables: consumables?.map((i: any) => ({ ...i, createdAt: i?.createdAt?.toISOString?.() ?? '', updatedAt: i?.updatedAt?.toISOString?.() ?? '' })) ?? [],
+        hardware: serializeAll(hardware),
+        licenses: serializeAll(licenses),
+        consumables: serializeAll(consumables),
       })
-    } else if (type === 'movements') {
-      const where: any = {}
-      if (startDate || endDate) {
-        where.createdAt = {}
-        if (startDate) where.createdAt.gte = new Date(startDate)
-        if (endDate) where.createdAt.lte = new Date(endDate + 'T23:59:59.999Z')
-      }
+    }
+
+    if (type === 'movements') {
+      const gte = parseDateParam(searchParams.get('startDate'))
+      const lte = parseDateParam(searchParams.get('endDate'), true)
+      const where: Prisma.StockMovementWhereInput = gte || lte ? { createdAt: { gte, lte } } : {}
       const movements = await prisma.stockMovement.findMany({ where, orderBy: { createdAt: 'desc' }, take: 1000 })
-      return NextResponse.json(movements?.map((m: any) => ({ ...m, createdAt: m?.createdAt?.toISOString?.() ?? '' })) ?? [])
-    } else if (type === 'lowstock') {
+      return NextResponse.json(serializeAll(movements))
+    }
+
+    if (type === 'lowstock') {
       const [hardware, licenses, consumables] = await Promise.all([
         prisma.hardware.findMany(),
         prisma.license.findMany(),
         prisma.consumable.findMany(),
       ])
-      const items: any[] = []
-      hardware?.forEach((i: any) => {
-        if ((i?.quantity ?? 0) <= (i?.lowStockThreshold ?? 5)) items.push({ ...i, category: 'Donanım', itemName: i.name })
-      })
-      licenses?.forEach((i: any) => {
-        if ((i?.quantity ?? 0) <= (i?.lowStockThreshold ?? 5)) items.push({ ...i, category: 'Lisans', itemName: i.softwareName })
-      })
-      consumables?.forEach((i: any) => {
-        if ((i?.quantity ?? 0) <= (i?.lowStockThreshold ?? 5)) items.push({ ...i, category: 'Sarf Malzemesi', itemName: i.name })
-      })
-      return NextResponse.json(items)
+      return NextResponse.json([
+        ...hardware.filter(isLowStock).map((i) => ({ ...serialize(i), category: CATEGORY_LABELS.HARDWARE, itemName: i.name })),
+        ...licenses.filter(isLowStock).map((i) => ({ ...serialize(i), category: CATEGORY_LABELS.LICENSE, itemName: i.softwareName })),
+        ...consumables.filter(isLowStock).map((i) => ({ ...serialize(i), category: CATEGORY_LABELS.CONSUMABLE, itemName: i.name })),
+      ])
     }
 
     return NextResponse.json({ error: 'Geçersiz rapor tipi' }, { status: 400 })
-  } catch (error: any) {
-    console.error(error)
-    return NextResponse.json({ error: 'Hata' }, { status: 500 })
+  } catch (error) {
+    return serverError('Reports error', error, 'Rapor oluşturulurken hata oluştu')
   }
 }
