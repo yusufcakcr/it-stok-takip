@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { X } from 'lucide-react'
 
-interface Field {
+export interface Field {
   name: string
   label: string
   type?: string
@@ -13,29 +13,33 @@ interface Field {
   placeholder?: string
 }
 
+export type FormValues = Record<string, unknown>
+
 interface ItemFormDialogProps {
   open: boolean
   onClose: () => void
   title: string
   fields: Field[]
-  initialData?: any
-  onSubmit: (data: any) => Promise<void>
+  initialData?: object | null
+  onSubmit: (data: FormValues) => Promise<void>
+}
+
+function displayValue(value: unknown): string {
+  return value === null || value === undefined ? '' : String(value)
 }
 
 export function ItemFormDialog({ open, onClose, title, fields, initialData, onSubmit }: ItemFormDialogProps) {
-  const [formData, setFormData] = useState<any>({})
+  const [formData, setFormData] = useState<FormValues>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({ ...(initialData ?? {}) })
-    } else {
-      setFormData({})
-    }
+    setFormData(initialData ? { ...initialData } : {})
   }, [initialData, open])
 
   if (!open) return null
+
+  const setField = (name: string, value: string) => setFormData((prev) => ({ ...prev, [name]: value }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,8 +49,8 @@ export function ItemFormDialog({ open, onClose, title, fields, initialData, onSu
       await onSubmit(formData)
       onClose()
       setFormData({})
-    } catch (err: any) {
-      setError(err?.message ?? 'Hata oluştu')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Hata oluştu')
     } finally {
       setLoading(false)
     }
@@ -63,28 +67,28 @@ export function ItemFormDialog({ open, onClose, title, fields, initialData, onSu
         {error && <p className="text-destructive text-sm bg-destructive/10 rounded-lg p-2 mb-3">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {fields?.map((field: Field) => (
+          {fields.map((field) => (
             <div key={field.name}>
               <label className="text-sm font-medium">{field.label}{field.required && <span className="text-destructive"> *</span>}</label>
               {field.type === 'textarea' ? (
                 <textarea
                   className="w-full bg-muted border border-input rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-ring min-h-[80px]"
-                  value={formData?.[field.name] ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData((prev: any) => ({ ...(prev ?? {}), [field.name]: e.target.value }))}
+                  value={displayValue(formData[field.name])}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setField(field.name, e.target.value)}
                   placeholder={field.placeholder}
                 />
               ) : (
                 <Input
                   type={field.type || 'text'}
-                  value={formData?.[field.name] ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData((prev: any) => ({ ...(prev ?? {}), [field.name]: e.target.value }))}
+                  value={displayValue(formData[field.name])}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField(field.name, e.target.value)}
                   required={field.required}
                   placeholder={field.placeholder}
                   className="mt-1"
                 />
               )}
             </div>
-          )) ?? null}
+          ))}
           <Button type="submit" className="w-full" loading={loading}>
             {initialData ? 'Güncelle' : 'Ekle'}
           </Button>

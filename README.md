@@ -76,6 +76,8 @@ Bu sistem, şirket içi IT operasyonlarında karşılaşılan envanter karmaşas
 | **Veritabanı** | PostgreSQL (Neon Cloud / Yerel) |
 | **Kimlik Doğrulama** | Auth.js v5 (NextAuth.js Beta) + BcryptJS |
 | **Yetkilendirme** | Rota bazlı `proxy.ts` katmanı + rota içi `requireUser()` kontrolü |
+| **Doğrulama** | Zod (API istek gövdeleri, `lib/validation.ts`) |
+| **Test / CI** | Vitest + GitHub Actions (tip denetimi, lint, test) |
 
 ---
 
@@ -152,8 +154,11 @@ Alternatif olarak `.env` içindeki `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` de
 ```bash
 npm run lint       # kod kalitesi
 npm run typecheck  # TypeScript tip denetimi
+npm test           # birim testleri (doğrulama şemaları, stok hesapları, API rotaları)
 npm run build      # production build
 ```
+
+İlk üçü her push ve pull request'te GitHub Actions ile otomatik çalışır (`.github/workflows/ci.yml`).
 
 ---
 

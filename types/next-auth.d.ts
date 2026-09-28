@@ -1,25 +1,28 @@
 import { DefaultSession } from 'next-auth';
 import { JWT } from 'next-auth/jwt';
 
+type AppRole = 'ADMIN' | 'USER';
+
 declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      role?: string;
-      // Add custom fields here
+      role?: AppRole;
+      username?: string;
     } & DefaultSession['user']; // includes name, email, image
   }
 
   interface User {
     id: string;
-    role?: string;
-    // Mirror any fields added to Session['user'] above
+    role?: AppRole;
+    username?: string;
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
-    role?: string;
+    role?: AppRole;
+    username?: string;
   }
 }

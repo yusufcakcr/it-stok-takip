@@ -2,60 +2,35 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireUser, serverError } from '@/lib/api-auth'
+import { serialize, serializeAll } from '@/lib/serialize'
+import { CATEGORY_LABELS, expiringWithin, isLowStock, totalQuantity } from '@/lib/stock'
 
 export async function GET() {
   try {
     const guard = await requireUser()
     if (guard.error) return guard.error
 
-    const [hardwareCount, licenseCount, consumableCount, hardwareItems, licenseItems, consumableItems, recentMovements] = await Promise.all([
-      prisma.hardware.count(),
-      prisma.license.count(),
-      prisma.consumable.count(),
+    const [hardware, licenses, consumables, recentMovements] = await Promise.all([
       prisma.hardware.findMany(),
       prisma.license.findMany(),
       prisma.consumable.findMany(),
       prisma.stockMovement.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
     ])
 
-    const hardwareTotal = hardwareItems?.reduce((sum: number, i: any) => sum + (i?.quantity ?? 0), 0) ?? 0
-    const licenseTotal = licenseItems?.reduce((sum: number, i: any) => sum + (i?.quantity ?? 0), 0) ?? 0
-    const consumableTotal = consumableItems?.reduce((sum: number, i: any) => sum + (i?.quantity ?? 0), 0) ?? 0
-
-    const lowStockItems: any[] = []
-    hardwareItems?.forEach((item: any) => {
-      if ((item?.quantity ?? 0) <= (item?.lowStockThreshold ?? 5)) {
-        lowStockItems.push({ ...item, category: 'HARDWARE', categoryLabel: 'Donanım' })
-      }
-    })
-    licenseItems?.forEach((item: any) => {
-      if ((item?.quantity ?? 0) <= (item?.lowStockThreshold ?? 5)) {
-        lowStockItems.push({ ...item, category: 'LICENSE', categoryLabel: 'Lisans', name: item?.softwareName })
-      }
-    })
-    consumableItems?.forEach((item: any) => {
-      if ((item?.quantity ?? 0) <= (item?.lowStockThreshold ?? 5)) {
-        lowStockItems.push({ ...item, category: 'CONSUMABLE', categoryLabel: 'Sarf Malzemesi' })
-      }
-    })
-
-    // Expiring licenses (within 30 days)
-    const now = new Date()
-    const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-    const expiringLicenses = licenseItems?.filter((l: any) => l?.expiryDate && new Date(l.expiryDate) <= thirtyDays) ?? []
+    const lowStockItems = [
+      ...hardware.filter(isLowStock).map((i) => ({ ...serialize(i), category: 'HARDWARE' as const, categoryLabel: CATEGORY_LABELS.HARDWARE })),
+      ...licenses.filter(isLowStock).map((i) => ({ ...serialize(i), category: 'LICENSE' as const, categoryLabel: CATEGORY_LABELS.LICENSE, name: i.softwareName })),
+      ...consumables.filter(isLowStock).map((i) => ({ ...serialize(i), category: 'CONSUMABLE' as const, categoryLabel: CATEGORY_LABELS.CONSUMABLE })),
+    ]
 
     return NextResponse.json({
-      counts: { hardware: hardwareCount, license: licenseCount, consumable: consumableCount },
-      totals: { hardware: hardwareTotal, license: licenseTotal, consumable: consumableTotal },
+      counts: { hardware: hardware.length, license: licenses.length, consumable: consumables.length },
+      totals: { hardware: totalQuantity(hardware), license: totalQuantity(licenses), consumable: totalQuantity(consumables) },
       lowStockItems,
-      expiringLicenses,
-      recentMovements: recentMovements?.map((m: any) => ({
-        ...m,
-        createdAt: m?.createdAt?.toISOString?.() ?? '',
-      })) ?? [],
+      expiringLicenses: serializeAll(expiringWithin(licenses, 30)),
+      recentMovements: serializeAll(recentMovements),
     })
-  } catch (error: any) {
-    console.error('Dashboard error:', error)
-    return NextResponse.json({ error: 'Veri alınırken hata' }, { status: 500 })
+  } catch (error) {
+    return serverError('Dashboard error', error, 'Veri alınırken hata')
   }
 }

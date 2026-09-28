@@ -99,7 +99,7 @@ export function Sidebar({ user }: SidebarProps) {
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 py-2">Ana Menü</p>
-          {navItems?.map((item: any) => {
+          {navItems.map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith?.(item.href + '/')
             const Icon = item.icon
             return (
@@ -123,7 +123,7 @@ export function Sidebar({ user }: SidebarProps) {
           {user?.role === 'ADMIN' && (
             <>
               <p className="text-xs text-muted-foreground uppercase tracking-wider px-3 py-2 mt-4">Yönetim</p>
-              {adminItems?.map((item: any) => {
+              {adminItems.map((item) => {
                 const isActive = pathname === item.href
                 const Icon = item.icon
                 return (
