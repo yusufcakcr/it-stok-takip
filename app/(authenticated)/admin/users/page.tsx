@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { MAX_USERS, MIN_PASSWORD_LENGTH } from '@/lib/constants'
+import type { User } from '@/lib/types'
 
 export default function UsersAdminPage() {
   const { data: session, status } = useSession()
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [newUser, setNewUser] = useState({ username: '', email: '', name: '', password: '', role: 'USER' })
@@ -18,13 +19,13 @@ export default function UsersAdminPage() {
   const [resetPwId, setResetPwId] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
 
-  const isAdmin = (session?.user as any)?.role === 'ADMIN'
+  const isAdmin = session?.user?.role === 'ADMIN'
 
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch('/api/users')
       if (res.ok) setUsers(await res.json())
-    } catch (e: any) { console.error(e) }
+    } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [])
 
@@ -159,7 +160,7 @@ export default function UsersAdminPage() {
               </tr>
             </thead>
             <tbody>
-              {users?.map((user: any) => {
+              {users.map((user) => {
                 const isCurrent = user?.id === session?.user?.id
                 return (
                   <tr key={user?.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">

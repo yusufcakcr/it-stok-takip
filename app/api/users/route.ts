@@ -1,21 +1,22 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { requireUser, serverError } from '@/lib/api-auth'
-import { MIN_PASSWORD_LENGTH } from '@/lib/constants'
+import { serialize, serializeAll } from '@/lib/serialize'
+import { parseBody, readJson, userUpdateSchema } from '@/lib/validation'
 import bcrypt from 'bcryptjs'
+
+const PUBLIC_FIELDS = { id: true, email: true, username: true, name: true, role: true, createdAt: true } as const
 
 export async function GET() {
   try {
     const guard = await requireUser({ admin: true })
     if (guard.error) return guard.error
 
-    const users = await prisma.user.findMany({
-      select: { id: true, email: true, username: true, name: true, role: true, createdAt: true },
-      orderBy: { createdAt: 'asc' },
-    })
-    return NextResponse.json(users?.map((u: any) => ({ ...u, createdAt: u?.createdAt?.toISOString?.() ?? '' })) ?? [])
-  } catch (error: any) {
+    const users = await prisma.user.findMany({ select: PUBLIC_FIELDS, orderBy: { createdAt: 'asc' } })
+    return NextResponse.json(serializeAll(users))
+  } catch (error) {
     return serverError('Get users error', error, 'Kullanıcılar alınırken hata oluştu')
   }
 }
@@ -48,7 +49,7 @@ export async function DELETE(request: Request) {
 
     await prisma.user.delete({ where: { id } })
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error) {
     return serverError('Delete user error', error, 'Kullanıcı silinirken hata oluştu')
   }
 }
@@ -58,9 +59,11 @@ export async function PUT(request: Request) {
     const guard = await requireUser({ admin: true })
     if (guard.error) return guard.error
 
-    const body = await request.json()
-    const { id, password, role, name, email } = body
-    if (!id) return NextResponse.json({ error: 'Kullanıcı ID gerekli' }, { status: 400 })
+    const body = await readJson(request)
+    if (body === null) return NextResponse.json({ error: 'Geçersiz istek gövdesi' }, { status: 400 })
+    const parsed = parseBody(userUpdateSchema, body)
+    if (parsed.error !== null) return NextResponse.json({ error: parsed.error }, { status: 400 })
+    const { id, password, role, name, email } = parsed.data
 
     const targetUser = await prisma.user.findUnique({ where: { id } })
     if (!targetUser) {
@@ -75,38 +78,24 @@ export async function PUT(request: Request) {
       }
     }
 
-    const data: any = {}
-    if (password) {
-      if (String(password).length < MIN_PASSWORD_LENGTH) {
-        return NextResponse.json({ error: `Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalıdır` }, { status: 400 })
-      }
-      data.password = await bcrypt.hash(String(password), 12)
-    }
-    if (role && (role === 'ADMIN' || role === 'USER')) {
-      data.role = role
-    }
-    if (name !== undefined) {
-      data.name = String(name).trim() || targetUser.username
-    }
-    if (email !== undefined && String(email).trim()) {
-      const nextEmail = String(email).trim().toLowerCase()
+    const data: Prisma.UserUpdateInput = {}
+    if (password) data.password = await bcrypt.hash(password, 12)
+    if (role) data.role = role
+    if (name !== undefined) data.name = name || targetUser.username
+    if (email) {
       // E-posta benzersiz; çakışmayı Prisma hatası yerine anlaşılır mesajla bildir
-      const clash = await prisma.user.findFirst({ where: { email: nextEmail, NOT: { id } } })
+      const clash = await prisma.user.findFirst({ where: { email, NOT: { id } } })
       if (clash) return NextResponse.json({ error: 'Bu e-posta başka bir kullanıcıda kayıtlı' }, { status: 400 })
-      data.email = nextEmail
+      data.email = email
     }
 
     if (!Object.keys(data).length) {
       return NextResponse.json({ error: 'Güncellenecek alan yok' }, { status: 400 })
     }
 
-    const user = await prisma.user.update({
-      where: { id },
-      data,
-      select: { id: true, email: true, username: true, name: true, role: true, createdAt: true },
-    })
-    return NextResponse.json({ ...user, createdAt: user?.createdAt?.toISOString?.() ?? '' })
-  } catch (error: any) {
+    const user = await prisma.user.update({ where: { id }, data, select: PUBLIC_FIELDS })
+    return NextResponse.json(serialize(user))
+  } catch (error) {
     return serverError('Update user error', error, 'Kullanıcı güncellenirken hata oluştu')
   }
 }

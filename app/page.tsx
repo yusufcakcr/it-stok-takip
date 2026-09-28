@@ -8,9 +8,10 @@ export default async function Home() {
     if (session?.user) {
       redirect('/dashboard')
     }
-  } catch (error: any) {
+  } catch (error) {
     // If redirect throws standard Next.js digest, let it bubble
-    if (error?.digest?.startsWith?.('NEXT_REDIRECT')) {
+    const digest = (error as { digest?: unknown } | null)?.digest
+    if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) {
       throw error
     }
     console.error('Home auth error:', error)

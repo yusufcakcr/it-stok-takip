@@ -2,14 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Monitor, Key, Package, AlertTriangle, ArrowDownCircle, ArrowUpCircle, TrendingDown, CalendarClock } from 'lucide-react'
-
-interface DashboardData {
-  counts: { hardware: number; license: number; consumable: number }
-  totals: { hardware: number; license: number; consumable: number }
-  lowStockItems: any[]
-  expiringLicenses: any[]
-  recentMovements: any[]
-}
+import type { DashboardData } from '@/lib/types'
 
 function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0)
@@ -39,7 +32,7 @@ export default function DashboardPage() {
         const json = await res.json()
         setData(json)
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
@@ -57,9 +50,9 @@ export default function DashboardPage() {
   }
 
   const stats = [
-    { label: 'Donanım', count: data?.counts?.hardware ?? 0, total: data?.totals?.hardware ?? 0, icon: Monitor, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    { label: 'Lisans', count: data?.counts?.license ?? 0, total: data?.totals?.license ?? 0, icon: Key, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    { label: 'Sarf Malzemesi', count: data?.counts?.consumable ?? 0, total: data?.totals?.consumable ?? 0, icon: Package, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+    { label: 'Donanım', count: data?.counts?.hardware ?? 0, total: data?.totals?.hardware ?? 0, icon: Monitor, color: 'text-blue-400', bg: 'bg-blue-400/10', isWarning: false },
+    { label: 'Lisans', count: data?.counts?.license ?? 0, total: data?.totals?.license ?? 0, icon: Key, color: 'text-emerald-400', bg: 'bg-emerald-400/10', isWarning: false },
+    { label: 'Sarf Malzemesi', count: data?.counts?.consumable ?? 0, total: data?.totals?.consumable ?? 0, icon: Package, color: 'text-amber-400', bg: 'bg-amber-400/10', isWarning: false },
     { label: 'Düşük Stok Uyarısı', count: data?.lowStockItems?.length ?? 0, total: 0, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-400/10', isWarning: true },
   ]
 
@@ -71,7 +64,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat: any) => {
+        {stats.map((stat) => {
           const Icon = stat.icon
           return (
             <div
@@ -107,7 +100,7 @@ export default function DashboardPage() {
             <p className="text-muted-foreground text-sm py-4 text-center">Tüm stoklar yeterli seviyede ✅</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {data?.lowStockItems?.map((item: any, i: number) => (
+              {data?.lowStockItems?.map((item, i) => (
                 <div key={i} className="flex items-center justify-between bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
                   <div>
                     <p className="text-sm font-medium">{item?.name ?? item?.softwareName ?? '-'}</p>
@@ -136,7 +129,7 @@ export default function DashboardPage() {
             <p className="text-muted-foreground text-sm py-4 text-center">Süresi dolmuş veya dolacak lisans yok ✅</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {data?.expiringLicenses?.map((lic: any, i: number) => {
+              {data?.expiringLicenses?.map((lic, i) => {
                 const isPast = lic?.expiryDate ? new Date(lic.expiryDate) < new Date() : false
                 return (
                   <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${isPast ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/5 border-amber-500/20'}`}>
@@ -181,7 +174,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.recentMovements?.map((m: any) => (
+                {data?.recentMovements?.map((m) => (
                   <tr key={m?.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                     <td className="py-2 px-3 font-mono text-xs">{m?.createdAt ? new Date(m.createdAt).toLocaleDateString('tr-TR') : '-'}</td>
                     <td className="py-2 px-3">{m?.userName ?? '-'}</td>

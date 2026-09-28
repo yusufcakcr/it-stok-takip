@@ -4,10 +4,26 @@ import { useEffect, useState, useCallback } from 'react'
 import { BarChart3, Printer, Filter, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { isLowStock } from '@/lib/stock'
+import type { ConsumableItem, HardwareItem, LicenseItem, StockMovement } from '@/lib/types'
+
+type StockReport = { hardware: HardwareItem[]; licenses: LicenseItem[]; consumables: ConsumableItem[] }
+type LowStockRow = { id: string; itemName: string; category: string; quantity: number; lowStockThreshold: number }
+type ReportData = StockReport | StockMovement[] | LowStockRow[]
+
+/**
+ * CSV hücresi: tırnaklar kaçırılır; =, +, -, @ ile başlayan değerlerin önüne ' eklenir ki
+ * Excel onları formül olarak çalıştırmasın (CSV injection).
+ */
+function cell(value: unknown): string {
+  const text = String(value ?? '')
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text
+  return `"${safe.replace(/"/g, '""')}"`
+}
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState('stock')
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -20,11 +36,16 @@ export default function ReportsPage() {
       if (endDate) params.set('endDate', endDate)
       const res = await fetch(`/api/reports?${params.toString()}`)
       if (res.ok) setData(await res.json())
-    } catch (e: any) { console.error(e) }
+    } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [reportType, startDate, endDate])
 
   useEffect(() => { fetchReport() }, [fetchReport])
+
+  const stock = data && !Array.isArray(data) ? data : null
+  const rows = Array.isArray(data) ? data : []
+  const movements = reportType === 'movements' ? (rows as StockMovement[]) : []
+  const lowStock = reportType === 'lowstock' ? (rows as LowStockRow[]) : []
 
   const categoryLabels: Record<string, string> = {
     'HARDWARE': 'Donanım', 'LICENSE': 'Lisans', 'CONSUMABLE': 'Sarf Malzemesi',
@@ -36,27 +57,22 @@ export default function ReportsPage() {
     let csvContent = '\uFEFF' // UTF-8 BOM for Excel Turkish Characters
     const filename = `it_stok_rapor_${reportType}_${new Date().toISOString().slice(0, 10)}.csv`
 
-    if (reportType === 'stock') {
-      csvContent += 'Kategori;Ürün Adı;Marka/Model;Konum/Birim/Bitiş Tarihi;Stok;Eşik\n'
-      data.hardware?.forEach((i: any) => {
-        csvContent += `Donanım;"${i.name || ''}";"${[i.brand, i.model].filter(Boolean).join(' ')}";"${i.location || ''}";${i.quantity || 0};${i.lowStockThreshold || 5}\n`
-      })
-      data.licenses?.forEach((i: any) => {
-        csvContent += `Lisans;"${i.softwareName || ''}";"-";"${i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('tr-TR') : '-'}";${i.quantity || 0};${i.lowStockThreshold || 5}\n`
-      })
-      data.consumables?.forEach((i: any) => {
-        csvContent += `Sarf Malzemesi;"${i.name || ''}";"${i.brand || ''}";"${i.unit || 'Adet'}";${i.quantity || 0};${i.lowStockThreshold || 5}\n`
-      })
-    } else if (reportType === 'movements' && Array.isArray(data)) {
-      csvContent += 'Tarih;Kullanıcı;Ürün;Kategori;İşlem Tipi;Miktar;Açıklama\n'
-      data.forEach((m: any) => {
-        csvContent += `"${m.createdAt ? new Date(m.createdAt).toLocaleString('tr-TR') : '-'}";"${m.userName || ''}";"${m.itemName || ''}";"${categoryLabels[m.itemCategory] || m.itemCategory || ''}";"${categoryLabels[m.movementType] || m.movementType || ''}";${m.quantity || 0};"${m.description || ''}"\n`
-      })
-    } else if (reportType === 'lowstock' && Array.isArray(data)) {
-      csvContent += 'Ürün;Kategori;Mevcut Stok;Eşik\n'
-      data.forEach((i: any) => {
-        csvContent += `"${i.itemName || ''}";"${i.category || ''}";${i.quantity || 0};${i.lowStockThreshold || 5}\n`
-      })
+    const line = (...cells: unknown[]) => { csvContent += cells.map(cell).join(';') + '\n' }
+
+    if (reportType === 'stock' && stock) {
+      line('Kategori', 'Ürün Adı', 'Marka/Model', 'Konum/Birim/Bitiş Tarihi', 'Stok', 'Eşik')
+      stock.hardware.forEach((i) => line('Donanım', i.name, [i.brand, i.model].filter(Boolean).join(' '), i.location, i.quantity, i.lowStockThreshold))
+      stock.licenses.forEach((i) => line('Lisans', i.softwareName, '-', i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('tr-TR') : '-', i.quantity, i.lowStockThreshold))
+      stock.consumables.forEach((i) => line('Sarf Malzemesi', i.name, i.brand, i.unit || 'Adet', i.quantity, i.lowStockThreshold))
+    } else if (reportType === 'movements') {
+      line('Tarih', 'Kullanıcı', 'Ürün', 'Kategori', 'İşlem Tipi', 'Miktar', 'Açıklama')
+      movements.forEach((m) => line(
+        m.createdAt ? new Date(m.createdAt).toLocaleString('tr-TR') : '-', m.userName, m.itemName,
+        categoryLabels[m.itemCategory] ?? m.itemCategory, categoryLabels[m.movementType] ?? m.movementType, m.quantity, m.description,
+      ))
+    } else if (reportType === 'lowstock') {
+      line('Ürün', 'Kategori', 'Mevcut Stok', 'Eşik')
+      lowStock.forEach((i) => line(i.itemName, i.category, i.quantity, i.lowStockThreshold))
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -118,12 +134,12 @@ export default function ReportsPage() {
 
       {loading ? (
         <div className="flex justify-center py-12"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>
-      ) : reportType === 'stock' && data ? (
+      ) : reportType === 'stock' && stock ? (
         <div className="space-y-6">
           {/* Hardware */}
           <div className="bg-card rounded-xl p-5 shadow-sm border border-border" style={{ boxShadow: 'var(--shadow-md)' }}>
             <h3 className="font-display font-semibold mb-3">Donanım Stok Durumu</h3>
-            {(data?.hardware?.length ?? 0) === 0 ? <p className="text-muted-foreground text-sm">Veri bulunamadı</p> : (
+            {stock.hardware.length === 0 ? <p className="text-muted-foreground text-sm">Veri bulunamadı</p> : (
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border bg-muted/30">
                   <th className="text-left py-2 px-3 text-muted-foreground font-medium">Ürün</th>
@@ -132,22 +148,22 @@ export default function ReportsPage() {
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Stok</th>
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Eşik</th>
                 </tr></thead>
-                <tbody>{data?.hardware?.map((i: any) => (
+                <tbody>{stock.hardware.map((i) => (
                   <tr key={i?.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="py-2 px-3 font-medium">{i?.name ?? '-'}</td>
                     <td className="py-2 px-3 text-muted-foreground">{[i?.brand, i?.model].filter(Boolean).join(' ') || '-'}</td>
                     <td className="py-2 px-3 text-muted-foreground">{i?.location ?? '-'}</td>
-                    <td className={`py-2 px-3 text-right font-mono ${(i?.quantity ?? 0) <= (i?.lowStockThreshold ?? 5) ? 'text-red-400 font-bold' : ''}`}>{i?.quantity ?? 0}</td>
+                    <td className={`py-2 px-3 text-right font-mono ${isLowStock(i) ? 'text-red-400 font-bold' : ''}`}>{i?.quantity ?? 0}</td>
                     <td className="py-2 px-3 text-right font-mono text-muted-foreground">{i?.lowStockThreshold ?? 5}</td>
                   </tr>
-                )) ?? null}</tbody>
+                ))}</tbody>
               </table>
             )}
           </div>
           {/* Licenses */}
           <div className="bg-card rounded-xl p-5 shadow-sm border border-border" style={{ boxShadow: 'var(--shadow-md)' }}>
             <h3 className="font-display font-semibold mb-3">Lisans Stok Durumu</h3>
-            {(data?.licenses?.length ?? 0) === 0 ? <p className="text-muted-foreground text-sm">Veri bulunamadı</p> : (
+            {stock.licenses.length === 0 ? <p className="text-muted-foreground text-sm">Veri bulunamadı</p> : (
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border bg-muted/30">
                   <th className="text-left py-2 px-3 text-muted-foreground font-medium">Yazılım</th>
@@ -155,21 +171,21 @@ export default function ReportsPage() {
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Stok</th>
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Eşik</th>
                 </tr></thead>
-                <tbody>{data?.licenses?.map((i: any) => (
+                <tbody>{stock.licenses.map((i) => (
                   <tr key={i?.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="py-2 px-3 font-medium">{i?.softwareName ?? '-'}</td>
                     <td className="py-2 px-3 text-muted-foreground">{i?.expiryDate ? new Date(i.expiryDate).toLocaleDateString('tr-TR') : '-'}</td>
-                    <td className={`py-2 px-3 text-right font-mono ${(i?.quantity ?? 0) <= (i?.lowStockThreshold ?? 5) ? 'text-red-400 font-bold' : ''}`}>{i?.quantity ?? 0}</td>
+                    <td className={`py-2 px-3 text-right font-mono ${isLowStock(i) ? 'text-red-400 font-bold' : ''}`}>{i?.quantity ?? 0}</td>
                     <td className="py-2 px-3 text-right font-mono text-muted-foreground">{i?.lowStockThreshold ?? 5}</td>
                   </tr>
-                )) ?? null}</tbody>
+                ))}</tbody>
               </table>
             )}
           </div>
           {/* Consumables */}
           <div className="bg-card rounded-xl p-5 shadow-sm border border-border" style={{ boxShadow: 'var(--shadow-md)' }}>
             <h3 className="font-display font-semibold mb-3">Sarf Malzemesi Stok Durumu</h3>
-            {(data?.consumables?.length ?? 0) === 0 ? <p className="text-muted-foreground text-sm">Veri bulunamadı</p> : (
+            {stock.consumables.length === 0 ? <p className="text-muted-foreground text-sm">Veri bulunamadı</p> : (
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border bg-muted/30">
                   <th className="text-left py-2 px-3 text-muted-foreground font-medium">Ürün</th>
@@ -178,15 +194,15 @@ export default function ReportsPage() {
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Stok</th>
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Eşik</th>
                 </tr></thead>
-                <tbody>{data?.consumables?.map((i: any) => (
+                <tbody>{stock.consumables.map((i) => (
                   <tr key={i?.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="py-2 px-3 font-medium">{i?.name ?? '-'}</td>
                     <td className="py-2 px-3 text-muted-foreground">{i?.brand ?? '-'}</td>
                     <td className="py-2 px-3 text-muted-foreground">{i?.unit ?? 'Adet'}</td>
-                    <td className={`py-2 px-3 text-right font-mono ${(i?.quantity ?? 0) <= (i?.lowStockThreshold ?? 5) ? 'text-red-400 font-bold' : ''}`}>{i?.quantity ?? 0}</td>
+                    <td className={`py-2 px-3 text-right font-mono ${isLowStock(i) ? 'text-red-400 font-bold' : ''}`}>{i?.quantity ?? 0}</td>
                     <td className="py-2 px-3 text-right font-mono text-muted-foreground">{i?.lowStockThreshold ?? 5}</td>
                   </tr>
-                )) ?? null}</tbody>
+                ))}</tbody>
               </table>
             )}
           </div>
@@ -194,7 +210,7 @@ export default function ReportsPage() {
       ) : reportType === 'movements' && Array.isArray(data) ? (
         <div className="bg-card rounded-xl p-5 shadow-sm border border-border" style={{ boxShadow: 'var(--shadow-md)' }}>
           <h3 className="font-display font-semibold mb-3">Stok Hareketleri</h3>
-          {data.length === 0 ? <p className="text-muted-foreground text-sm">Hareket kaydı bulunamadı</p> : (
+          {movements.length === 0 ? <p className="text-muted-foreground text-sm">Hareket kaydı bulunamadı</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border bg-muted/30">
@@ -206,15 +222,15 @@ export default function ReportsPage() {
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Miktar</th>
                   <th className="text-left py-2 px-3 text-muted-foreground font-medium">Açıklama</th>
                 </tr></thead>
-                <tbody>{data.map((m: any) => (
+                <tbody>{movements.map((m) => (
                   <tr key={m?.id} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{m?.createdAt ? new Date(m.createdAt).toLocaleString('tr-TR') : '-'}</td>
                     <td className="py-2 px-3">{m?.userName ?? '-'}</td>
                     <td className="py-2 px-3 font-medium">{m?.itemName ?? '-'}</td>
-                    <td className="py-2 px-3 text-muted-foreground text-xs">{categoryLabels?.[m?.itemCategory] ?? m?.itemCategory ?? '-'}</td>
+                    <td className="py-2 px-3 text-muted-foreground text-xs">{categoryLabels[m.itemCategory] ?? m.itemCategory ?? '-'}</td>
                     <td className="py-2 px-3">
                       <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${m?.movementType === 'IN' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {categoryLabels?.[m?.movementType] ?? m?.movementType ?? '-'}
+                        {categoryLabels[m.movementType] ?? m.movementType ?? '-'}
                       </span>
                     </td>
                     <td className="py-2 px-3 text-right font-mono">{m?.quantity ?? 0}</td>
@@ -228,7 +244,7 @@ export default function ReportsPage() {
       ) : reportType === 'lowstock' && Array.isArray(data) ? (
         <div className="bg-card rounded-xl p-5 shadow-sm border border-border" style={{ boxShadow: 'var(--shadow-md)' }}>
           <h3 className="font-display font-semibold mb-3">Düşük Stok Raporu</h3>
-          {data.length === 0 ? <p className="text-muted-foreground text-sm">Düşük stoklu ürün bulunmamaktadır ✅</p> : (
+          {lowStock.length === 0 ? <p className="text-muted-foreground text-sm">Düşük stoklu ürün bulunmamaktadır ✅</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border bg-muted/30">
@@ -237,7 +253,7 @@ export default function ReportsPage() {
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Mevcut</th>
                   <th className="text-right py-2 px-3 text-muted-foreground font-medium">Eşik</th>
                 </tr></thead>
-                <tbody>{data.map((i: any, idx: number) => (
+                <tbody>{lowStock.map((i, idx) => (
                   <tr key={idx} className="border-b border-border/50 hover:bg-muted/20">
                     <td className="py-2 px-3 font-medium text-red-400">{i?.itemName ?? '-'}</td>
                     <td className="py-2 px-3 text-muted-foreground">{i?.category ?? '-'}</td>

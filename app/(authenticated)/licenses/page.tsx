@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Key, Plus, Pencil, Trash2, ArrowLeftRight, AlertTriangle, Search, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ItemFormDialog } from '@/components/item-form-dialog'
 import { StockMovementDialog } from '@/components/stock-movement-dialog'
-import { toast } from 'sonner'
+import { TablePagination } from '@/components/table-pagination'
+import { useItemCrud } from '@/hooks/use-item-crud'
+import { usePagination } from '@/hooks/use-pagination'
+import { isLowStock } from '@/lib/stock'
+import type { LicenseItem } from '@/lib/types'
 
 const fields = [
   { name: 'softwareName', label: 'Yazılım Adı', required: true, placeholder: 'Örn: Microsoft 365, Adobe CC' },
@@ -18,56 +22,24 @@ const fields = [
 ]
 
 export default function LicensesPage() {
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { items, loading, refresh, save, remove } = useItemCrud<LicenseItem>('/api/licenses', {
+    created: 'Yeni lisans eklendi',
+    updated: 'Lisans güncellendi',
+    deleted: 'Lisans silindi',
+    confirmDelete: 'Bu lisansı silmek istediğinize emin misiniz?',
+  })
   const [search, setSearch] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [editItem, setEditItem] = useState<any>(null)
-  const [movementItem, setMovementItem] = useState<any>(null)
+  const [editItem, setEditItem] = useState<LicenseItem | null>(null)
+  const [movementItem, setMovementItem] = useState<LicenseItem | null>(null)
 
-  const fetchItems = useCallback(async () => {
-    try {
-      const res = await fetch('/api/licenses')
-      if (res.ok) setItems(await res.json())
-    } catch (e: any) { console.error(e) }
-    finally { setLoading(false) }
-  }, [])
+  const q = search.toLowerCase()
+  const filtered = items.filter((i) =>
+    [i.softwareName, i.licenseKey].some((v) => (v ?? '').toLowerCase().includes(q))
+  )
+  const pager = usePagination(filtered)
 
-  useEffect(() => { fetchItems() }, [fetchItems])
-
-  const handleSubmit = async (data: any) => {
-    const method = data?.id ? 'PUT' : 'POST'
-    const res = await fetch('/api/licenses', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const resData = await res.json()
-    if (!res.ok) {
-      throw new Error(resData?.error ?? 'Hata oluştu')
-    }
-    toast.success(data?.id ? 'Lisans güncellendi' : 'Yeni lisans eklendi')
-    fetchItems()
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bu lisansı silmek istediğinize emin misiniz?')) return
-    const res = await fetch(`/api/licenses?id=${id}`, { method: 'DELETE' })
-    const resData = await res.json()
-    if (res.ok) {
-      toast.success('Lisans silindi')
-      fetchItems()
-    } else {
-      toast.error(resData?.error ?? 'Silme işlemi başarısız')
-    }
-  }
-
-  const filtered = items?.filter((i: any) =>
-    (i?.softwareName ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (i?.licenseKey ?? '').toLowerCase().includes(search.toLowerCase())
-  ) ?? []
-
-  const isExpiringSoon = (date: string | null) => {
+  const isExpiringSoon = (date?: string | null) => {
     if (!date) return false
     const d = new Date(date)
     const now = new Date()
@@ -75,7 +47,7 @@ export default function LicensesPage() {
     return diff > 0 && diff <= 30 * 24 * 60 * 60 * 1000
   }
 
-  const isExpired = (date: string | null) => {
+  const isExpired = (date?: string | null) => {
     if (!date) return false
     return new Date(date) < new Date()
   }
@@ -96,7 +68,7 @@ export default function LicensesPage() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} placeholder="Lisans ara..." className="pl-10" />
+        <Input value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); pager.setPage(1) }} placeholder="Lisans ara..." className="pl-10" />
       </div>
 
       {loading ? (
@@ -116,8 +88,8 @@ export default function LicensesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item: any) => {
-                const isLow = (item?.quantity ?? 0) <= (item?.lowStockThreshold ?? 5)
+              {pager.pageItems.map((item) => {
+                const isLow = isLowStock(item)
                 const expSoon = isExpiringSoon(item?.expiryDate)
                 const expired = isExpired(item?.expiryDate)
                 return (
@@ -160,7 +132,7 @@ export default function LicensesPage() {
                         <Button variant="ghost" size="icon-sm" onClick={() => { setEditItem({ ...item, expiryDate: item?.expiryDate ? item.expiryDate.split('T')[0] : '' }); setFormOpen(true) }} title="Düzenle">
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(item?.id)} title="Sil">
+                        <Button variant="ghost" size="icon-sm" onClick={() => remove(item.id)} title="Sil">
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </div>
@@ -170,6 +142,7 @@ export default function LicensesPage() {
               })}
             </tbody>
           </table>
+          <TablePagination {...pager} onPageChange={pager.setPage} />
         </div>
       )}
 
@@ -179,18 +152,18 @@ export default function LicensesPage() {
         title={editItem ? 'Lisans Düzenle' : 'Yeni Lisans Ekle'}
         fields={fields}
         initialData={editItem}
-        onSubmit={handleSubmit}
+        onSubmit={save}
       />
 
       {movementItem && (
         <StockMovementDialog
           open={!!movementItem}
           onClose={() => setMovementItem(null)}
-          itemId={movementItem?.id}
-          itemName={movementItem?.softwareName ?? ''}
+          itemId={movementItem.id}
+          itemName={movementItem.softwareName}
           itemCategory="LICENSE"
-          currentQuantity={movementItem?.quantity ?? 0}
-          onSuccess={fetchItems}
+          currentQuantity={movementItem.quantity}
+          onSuccess={refresh}
         />
       )}
     </div>
