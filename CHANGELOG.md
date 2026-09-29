@@ -2,6 +2,14 @@
 
 En yeni sürüm en üstte.
 
+## [1.2.1] — 2026-09-29 — Güvenlik yaması
+
+### Güvenlik
+- **Next.js 16.3.0 → 16.3.6.** 16.0.0–16.3.2 aralığındaki iki kritik uzaktan kod çalıştırma açığı
+  kapatıldı ([GHSA-p293-qw3h-jr36](https://github.com/advisories/GHSA-p293-qw3h-jr36),
+  [GHSA-2xp9-vwfh-vxw4](https://github.com/advisories/GHSA-2xp9-vwfh-vxw4)). `eslint-config-next`
+  aynı sürüme çekildi. `npm audit` artık açık göstermiyor.
+
 ## [1.2.0] — 2026-09-28 — Kod kalitesi ve test altyapısı
 
 ### Değişti
