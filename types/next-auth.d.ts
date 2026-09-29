@@ -16,6 +16,7 @@ declare module 'next-auth' {
     id: string;
     role?: AppRole;
     username?: string;
+    pwd?: string;
   }
 }
 
@@ -24,5 +25,7 @@ declare module 'next-auth/jwt' {
     id: string;
     role?: AppRole;
     username?: string;
+    /** Parola hash özeti; parola değişince oturum düşer (bkz. lib/session-token.ts). */
+    pwd?: string;
   }
 }

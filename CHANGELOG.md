@@ -2,6 +2,21 @@
 
 En yeni sürüm en üstte.
 
+## [1.2.2] — 2026-09-29 — Oturum doğrulama
+
+### Güvenlik
+- **Oturumlar her istekte veritabanından doğrulanıyor.** Önceden rol ve hesap bilgisi yalnız girişte
+  jetona yazılıyordu. Bu yüzden silinen kullanıcı, rolü düşürülen yönetici ya da parolası
+  değiştirilen hesap 30 güne kadar erişimini koruyordu. Artık:
+  - Silinen kullanıcının oturumu bir sonraki istekte düşüyor.
+  - Rol değişikliği hemen geçerli oluyor.
+  - Parola değişince o hesabın tüm açık oturumları kapanıyor (`lib/session-token.ts`).
+- Veritabanı şeması değişmedi. Bu sürüme geçişte açık oturumlar bir kez sonlanır; herkesin yeniden
+  giriş yapması gerekir.
+
+### Eklendi
+- Oturum eşitleme için 6 birim testi (toplam 33).
+
 ## [1.2.1] — 2026-09-29 — Güvenlik yaması
 
 ### Güvenlik
