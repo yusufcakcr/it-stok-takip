@@ -10,8 +10,9 @@ export type SessionUser = {
 }
 
 /**
- * API rotaları için tek noktadan oturum/rol kontrolü. middleware.ts ilk savunma hattı;
- * burası rotanın kendi içinde de garanti verir (middleware matcher'ı değişse bile açık kalmaz).
+ * API rotaları için tek noktadan oturum/rol kontrolü. proxy.ts ilk savunma hattı;
+ * burası rotanın kendi içinde de garanti verir (proxy matcher'ı değişse bile açık kalmaz).
+ * Rol ve hesabın varlığı her istekte veritabanından doğrulanır (bkz. auth.ts `jwt` callback).
  *
  * Kullanım:  const guard = await requireUser();  if (guard.error) return guard.error
  */
