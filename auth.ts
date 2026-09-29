@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { passwordFingerprint, syncToken } from '@/lib/session-token'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -36,6 +37,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name ?? user.username,
           role: user.role,
           username: user.username,
+          pwd: passwordFingerprint(user.password),
         }
       },
     }),
@@ -46,8 +48,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id
         token.role = user.role
         token.username = user.username
+        token.pwd = user.pwd
+        return token
       }
-      return token
+      // Silinen hesap, düşürülen rol ve değişen parola bir sonraki istekte geçerli olsun
+      if (!token.id) return null
+      const dbUser = await prisma.user.findUnique({
+        where: { id: token.id },
+        select: { role: true, username: true, name: true, email: true, password: true },
+      })
+      return syncToken(token, dbUser)
     },
     async session({ session, token }) {
       if (session.user) {
